@@ -11,4 +11,20 @@
     "react": "^18",
     "react-dom": "^18"
   }
+}{
+  "name": "sahlansuuq",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "webpack-cli": "^5.1.4"
+  }
 }
