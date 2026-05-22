@@ -5,12 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   "https://eilhtjnpvexwwsaocgd.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
-  eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbGh0am5wd
-  nZleHd3c2FvY2dkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3N
-    zkzNTYzODMsImV4cCI6MjA5NDkzMjM4M30.
-      EQzdeAjV3WGJmB5fBUErpEqI0rgaVBZm-
-      Qbq5CZwUvQ
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbGh0am5wdnZleHd3c2FvY2dkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTYzODMsImV4cCI6MjA5NDkzMjM4M30.EQzdeAjV3WGJmB5fBUErpEqI0rgaVBZm-Qbq5CZwUvQ
 );
 
 export default function AddProduct() {
