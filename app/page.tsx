@@ -54,11 +54,7 @@ export default function HomePage() {
               placeholder="Raadi alaab, category ama magaalo..."
               className="w-full border rounded-l-xl px-4 py-3 outline-none"
             />
-            <button className="bg-red-600 text-white px-6 rounded-r-xl font-semibold">
-              Search
-            </button>
-          </div>
-<a
+ <a
   href="/add-product"
   className="bg-red-600 text-white px-5 py-3 rounded-2xl"
 >
