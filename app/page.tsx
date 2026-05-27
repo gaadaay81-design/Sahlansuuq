@@ -60,8 +60,7 @@ export default function HomePage() {
 >
   Ku dar xayeysiis
   </a>        
-        </div>
-      </header>
+ </header>
 
       {/* Hero */}
       <section className="bg-white">
