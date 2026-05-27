@@ -58,10 +58,12 @@ export default function HomePage() {
               Search
             </button>
           </div>
-
-          <button className="bg-red-600 text-white px-5 py-3 rounded-xl font-semibold">
-            Ku dar xayeysiis
-          </button>
+<a
+  href="/add-product"
+  className="bg-red-600 text-white px-5 py-3 rounded-2xl"
+>
+  Ku dar xayeysiis
+  </a>        
         </div>
       </header>
 
