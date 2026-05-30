@@ -1,0 +1,45 @@
+{
+  "name": "SahlanSuuq — Suuqa Online ee Somalia",
+  "short_name": "SahlanSuuq",
+  "description": "Somalia's largest online marketplace — buy and sell cars, homes, phones and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E30613",
+  "orientation": "portrait",
+  "lang": "so",
+  "categories": ["shopping", "business"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23E30613'/><text y='400' font-size='380' x='60'>🛍️</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "label": "SahlanSuuq Homepage"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Xayeysiis Cusub",
+      "short_name": "Xayeysiis",
+      "description": "Xayeysiis cusub geli",
+      "url": "/?action=post",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📢</text></svg>", "sizes": "any"}]
+    },
+    {
+      "name": "Gaadiidka",
+      "short_name": "Gaadiid",
+      "url": "/?cat=Gaadiidka",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>", "sizes": "any"}]
+    }
+  ]
+}
