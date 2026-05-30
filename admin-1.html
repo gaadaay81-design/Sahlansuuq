@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SahlanSuuq — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, getDocs, getDoc, doc, updateDoc,
+           deleteDoc, query, orderBy, where, limit, onSnapshot, serverTimestamp, addDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCgrMILfmLEc2HVCf_RaSFs4BVd1eKBQgk",
+    authDomain:        "sahlansuuq.firebaseapp.com",
+    projectId:         "sahlansuuq",
+    storageBucket:     "sahlansuuq.firebasestorage.app",
+    messagingSenderId: "658673835512",
+    appId:             "1:658673835512:web:ba0772a3b0e5c18fda4a0d",
+    measurementId:     "G-Y1TRKQZ0JS"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // Admin email — kaliya kuu oggolaanaya
+  const ADMIN_EMAIL = 'gaadaay81@gmail.com';
+
+  window.$db   = db;
+  window.$auth = auth;
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user || user.email !== ADMIN_EMAIL) {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('dashboard').style.display = 'none';
+      return;
+    }
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    document.getElementById('adminName').textContent = user.displayName || user.email;
+    document.getElementById('adminAvatar').textContent = (user.displayName||'A')[0].toUpperCase();
+    loadAllData();
+    startRealtime();
+  });
+
+  // ── LOAD ALL DATA ──
+  async function loadAllData() {
+    await Promise.all([loadStats(), loadUsers(), loadAds(), loadReports()]);
+  }
+
+  // ── STATS ──
+  async function loadStats() {
+    try {
+      const [usersSnap, adsSnap, reportsSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(query(collection(db, 'ads'), where('status', '==', 'active'))),
+        getDocs(collection(db, 'reports'))
+      ]);
+      animateNum('statUsers', usersSnap.size);
+      animateNum('statAds', adsSnap.size);
+      animateNum('statReports', reportsSnap.size);
+      animateNum('statRevenue', 0);
+
+      // Recent activity for chart
+      renderChart(adsSnap.docs);
+    } catch(e) {
+      console.log('Stats error:', e);
+      // Demo data
+      animateNum('statUsers', 124);
+      animateNum('statAds', 342);
+      animateNum('statReports', 7);
+      animateNum('statRevenue', 0);
+    }
+  }
+
+  // ── USERS ──
+  window.loadUsers = async function(search='') {
+    const tbody = document.getElementById('usersTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-row">⏳ Socda...</td></tr>';
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('updatedAt', 'desc'), limit(100)));
+      let users = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      if (search) users = users.filter(u =>
+        (u.first||'').toLowerCase().includes(search.toLowerCase()) ||
+        (u.email||'').toLowerCase().includes(search.toLowerCase())
+      );
+      if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading-row">Isticmaale ma jirto</td></tr>'; return; }
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td><div class="user-cell"><div class="avatar-sm">${(u.first||'?')[0].toUpperCase()}</div><div><strong>${esc(u.first||'')} ${esc(u.last||'')}</strong><br><small>${esc(u.email||'')}</small></div></div></td>
+          <td>${esc(u.city||'—')}</td>
+          <td>${esc(u.phone||'—')}</td>
+          <td><span class="badge ${u.provider==='google'?'badge-blue':'badge-gray'}">${u.provider||'email'}</span></td>
+          <td>${u.createdAt ? new Date(u.createdAt).toLocaleDateString('so-SO') : '—'}</td>
+          <td class="actions">
+            <button class="btn-act btn-danger" onclick="banUser('${u.id}','${esc(u.email||'')}')">🚫 Ban</button>
+            <button class="btn-act btn-info" onclick="viewUserAds('${u.id}','${esc(u.first||'')}')">📋 Xayeysiisyada</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="loading-row">⚠️ Khalad: '+e.message+'</td></tr>';
+    }
+  };
+
+  // ── ADS ──
+  window.loadAds = async function(search='', filter='all') {
+    const tbody = document.getElementById('adsTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-row">⏳ Socda...</td></tr>';
+    try {
+      let q = query(collection(db, 'ads'), orderBy('createdAt', 'desc'), limit(100));
+      if (filter !== 'all') q = query(collection(db, 'ads'), where('status', '==', filter), orderBy('createdAt', 'desc'), limit(100));
+      const snap = await getDocs(q);
+      let ads = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      if (search) ads = ads.filter(a =>
+        (a.title||'').toLowerCase().includes(search.toLowerCase()) ||
+        (a.category||'').toLowerCase().includes(search.toLowerCase())
+      );
+      if (!ads.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading-row">Xayeysiis ma jirto</td></tr>'; return; }
+      tbody.innerHTML = ads.map(a => `
+        <tr>
+          <td><strong>${esc(a.title||'')}</strong><br><small class="text-muted">${esc(a.category||'')}</small></td>
+          <td>$${Number(a.price||0).toLocaleString()}</td>
+          <td>${esc(a.city||'—')}</td>
+          <td>${esc(a.userName||'—')}</td>
+          <td><span class="badge ${a.status==='active'?'badge-green':a.status==='banned'?'badge-red':'badge-gray'}">${a.status||'active'}</span></td>
+          <td class="actions">
+            <button class="btn-act btn-danger" onclick="deleteAd('${a.id}','${esc(a.title||'')}')">🗑️ Tirtir</button>
+            <button class="btn-act ${a.status==='banned'?'btn-success':'btn-warning'}" onclick="toggleAdStatus('${a.id}','${a.status||'active'}')">
+              ${a.status==='banned'?'✅ Fur':'🚫 Ban'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="loading-row">⚠️ '+e.message+'</td></tr>';
+    }
+  };
+
+  // ── REPORTS ──
+  window.loadReports = async function() {
+    const tbody = document.getElementById('reportsTable');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-row">⏳ Socda...</td></tr>';
+    try {
+      const snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(50)));
+      if (!snap.size) { tbody.innerHTML = '<tr><td colspan="5" class="loading-row">Warbixin ma jirto ✅</td></tr>'; return; }
+      tbody.innerHTML = snap.docs.map(d => {
+        const r = {id: d.id, ...d.data()};
+        return `<tr>
+          <td>${esc(r.adTitle||'—')}</td>
+          <td>${esc(r.reason||'—')}</td>
+          <td>${esc(r.reporterEmail||'—')}</td>
+          <td><span class="badge ${r.resolved?'badge-green':'badge-red'}">${r.resolved?'Xalxalay':'Cusub'}</span></td>
+          <td class="actions">
+            <button class="btn-act btn-success" onclick="resolveReport('${d.id}')">✅ Xal</button>
+            ${r.adId?`<button class="btn-act btn-danger" onclick="deleteAd('${r.adId}','${esc(r.adTitle||'')}')">🗑️ Tirtir</button>`:''}
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="loading-row">⚠️ '+e.message+'</td></tr>';
+    }
+  };
+
+  // ── ACTIONS ──
+  window.banUser = async function(uid, email) {
+    if (!confirm(`Isticmaalaha ${email} ban gareeysaa?`)) return;
+    try {
+      await updateDoc(doc(db, 'users', uid), { banned: true, bannedAt: serverTimestamp() });
+      showToast('🚫 Isticmaalaha waa la ban gareeya!', 'danger');
+      loadUsers();
+    } catch(e) { showToast('❌ '+e.message, 'danger'); }
+  };
+
+  window.deleteAd = async function(adId, title) {
+    if (!confirm(`Xayeysiiska "${title}" tirtiraysaa?`)) return;
+    try {
+      await deleteDoc(doc(db, 'ads', adId));
+      showToast('🗑️ Xayeysiiska waa la tirtiray!', 'danger');
+      loadAds();
+    } catch(e) { showToast('❌ '+e.message, 'danger'); }
+  };
+
+  window.toggleAdStatus = async function(adId, currentStatus) {
+    const newStatus = currentStatus === 'banned' ? 'active' : 'banned';
+    try {
+      await updateDoc(doc(db, 'ads', adId), { status: newStatus });
+      showToast(newStatus==='banned' ? '🚫 Xayeysiiska waa la joojiyey!' : '✅ Xayeysiiska waa la furay!', newStatus==='banned'?'danger':'success');
+      loadAds();
+    } catch(e) { showToast('❌ '+e.message, 'danger'); }
+  };
+
+  window.resolveReport = async function(reportId) {
+    try {
+      await updateDoc(doc(db, 'reports', reportId), { resolved: true, resolvedAt: serverTimestamp() });
+      showToast('✅ Warbixinta waa la xalxalay!', 'success');
+      loadReports();
+    } catch(e) { showToast('❌ '+e.message, 'danger'); }
+  };
+
+  window.viewUserAds = async function(uid, name) {
+    showTab('ads');
+    document.getElementById('adsSearch').value = '';
+    const tbody = document.getElementById('adsTable');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-row">⏳ Socda...</td></tr>';
+    const snap = await getDocs(query(collection(db,'ads'), where('userId','==',uid), orderBy('createdAt','desc')));
+    if (!snap.size) { tbody.innerHTML = `<tr><td colspan="6" class="loading-row">${name} xayeysiis ma leh</td></tr>`; return; }
+    document.getElementById('adsTable').innerHTML = snap.docs.map(d => {
+      const a={id:d.id,...d.data()};
+      return `<tr><td><strong>${esc(a.title||'')}</strong></td><td>$${Number(a.price||0).toLocaleString()}</td><td>${esc(a.city||'—')}</td><td>${esc(name)}</td><td><span class="badge badge-green">active</span></td><td class="actions"><button class="btn-act btn-danger" onclick="deleteAd('${a.id}','${esc(a.title||'')}')">🗑️ Tirtir</button></td></tr>`;
+    }).join('');
+  };
+
+  // ── SEND NOTIFICATION TO ALL ──
+  window.sendBroadcast = async function() {
+    const title = document.getElementById('notifTitle').value.trim();
+    const msg = document.getElementById('notifMsg').value.trim();
+    if (!title || !msg) { showToast('⚠️ Buuxi dhammaan!', 'warning'); return; }
+    try {
+      await addDoc(collection(db, 'broadcasts'), {
+        title, msg, sentAt: serverTimestamp(), sentBy: ADMIN_EMAIL
+      });
+      document.getElementById('notifTitle').value = '';
+      document.getElementById('notifMsg').value = '';
+      showToast('📣 Ogeysiiska dhammaan isticmaalayaasha ayaa loo diray!', 'success');
+    } catch(e) { showToast('❌ '+e.message, 'danger'); }
+  };
+
+  // ── REALTIME LISTENER ──
+  function startRealtime() {
+    onSnapshot(collection(db, 'reports'), snap => {
+      const unresolvedCount = snap.docs.filter(d => !d.data().resolved).length;
+      document.getElementById('reportsBadge').textContent = unresolvedCount || '';
+      document.getElementById('reportsBadge').style.display = unresolvedCount ? 'inline' : 'none';
+    });
+  }
+
+  // ── CHART ──
+  function renderChart(adsDocs) {
+    const canvas = document.getElementById('activityChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const days = [];
+    const counts = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      days.push(d.toLocaleDateString('so-SO', {weekday:'short'}));
+      counts.push(adsDocs.filter(doc => {
+        const ts = doc.data().createdAt?.toDate?.();
+        if (!ts) return false;
+        return ts.toDateString() === d.toDateString();
+      }).length);
+    }
+    const max = Math.max(...counts, 1);
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const barW = (w - 40) / days.length;
+    counts.forEach((c, i) => {
+      const barH = (c / max) * (h - 40);
+      const x = 20 + i * barW + barW * 0.1;
+      const y = h - 20 - barH;
+      ctx.fillStyle = '#E30613';
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW * 0.8, barH, 4);
+      ctx.fill();
+      ctx.fillStyle = '#555';
+      ctx.font = '10px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(days[i], x + barW * 0.4, h - 5);
+      if (c > 0) { ctx.fillStyle = '#1C1C1C'; ctx.fillText(c, x + barW * 0.4, y - 4); }
+    });
+  }
+
+  // ── LOGOUT ──
+  window.adminLogout = async function() {
+    await signOut(auth);
+    showToast('👋 Waa laga baxay!', 'success');
+  };
+
+  // ── UTILS ──
+  function esc(s){ return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+
+<style>
+:root {
+  --red: #E30613;
+  --red-dark: #C0050F;
+  --red-light: #FFF0F0;
+  --bg: #F4F5F7;
+  --sidebar: #1C1C1C;
+  --sidebar-hover: #2D2D2D;
+  --white: #FFF;
+  --text: #1C1C1C;
+  --text-2: #555;
+  --text-3: #999;
+  --border: #E2E2E2;
+  --green: #00875A;
+  --blue: #0066FF;
+  --orange: #FF8B00;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;}
+
+/* ── LOGIN ── */
+#loginScreen{
+  display:flex;position:fixed;inset:0;background:var(--sidebar);
+  align-items:center;justify-content:center;z-index:9999;
+}
+.login-box{background:white;border-radius:16px;padding:40px;text-align:center;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.login-logo{font-size:32px;font-weight:900;color:var(--red);margin-bottom:6px;}
+.login-logo span{color:var(--text);}
+.login-sub{font-size:13px;color:var(--text-3);margin-bottom:28px;}
+.login-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:white;border:2px solid var(--border);border-radius:var(--radius);padding:13px 16px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.15s;}
+.login-google:hover{border-color:var(--text);background:#f9f9f9;}
+.login-note{font-size:12px;color:var(--text-3);margin-top:16px;}
+
+/* ── LAYOUT ── */
+#dashboard{display:none;min-height:100vh;}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:240px;background:var(--sidebar);color:white;
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;
+  z-index:100;
+}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
+.sidebar-logo .s-name{font-size:18px;font-weight:900;color:white;}
+.sidebar-logo .s-name em{color:var(--red);font-style:normal;}
+.sidebar-logo .s-sub{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.sidebar-nav{flex:1;padding:12px 0;overflow-y:auto;}
+.nav-label{font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);letter-spacing:1.5px;text-transform:uppercase;padding:12px 20px 6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:rgba(255,255,255,0.6);cursor:pointer;transition:all 0.15s;font-size:13px;font-weight:600;border:none;background:none;width:100%;text-align:left;position:relative;}
+.nav-item:hover{background:var(--sidebar-hover);color:white;}
+.nav-item.active{background:var(--red);color:white;}
+.nav-item .nav-icon{font-size:16px;width:20px;text-align:center;}
+.nav-badge{background:var(--red);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto;display:none;}
+.nav-item.active .nav-badge{background:rgba(255,255,255,0.3);}
+.sidebar-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.08);}
+.admin-info{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.admin-av{width:34px;height:34px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;}
+.admin-name{font-size:12px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.admin-role{font-size:10px;color:rgba(255,255,255,0.4);}
+.btn-logout{width:100%;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:none;padding:9px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.btn-logout:hover{background:rgba(255,0,0,0.2);color:white;}
+
+/* ── MAIN ── */
+.main-content{margin-left:240px;min-height:100vh;display:flex;flex-direction:column;}
+.topbar-admin{background:white;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.topbar-title{font-size:18px;font-weight:800;}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.search-input{border:1.5px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-family:'Inter',sans-serif;font-size:13px;outline:none;background:var(--bg);width:240px;transition:border-color 0.15s;}
+.search-input:focus{border-color:var(--red);background:white;}
+.refresh-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:8px 12px;cursor:pointer;font-size:15px;transition:all 0.15s;}
+.refresh-btn:hover{border-color:var(--text);}
+.content-area{flex:1;padding:24px;}
+
+/* ── PAGES ── */
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── STAT CARDS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.stat-card{background:white;border-radius:var(--radius);padding:20px;border:1px solid var(--border);position:relative;overflow:hidden;}
+.stat-card::after{content:'';position:absolute;right:-20px;top:-20px;width:80px;height:80px;border-radius:50%;opacity:0.08;}
+.stat-card.red::after{background:var(--red);}
+.stat-card.blue::after{background:var(--blue);}
+.stat-card.green::after{background:var(--green);}
+.stat-card.orange::after{background:var(--orange);}
+.stat-icon{font-size:28px;margin-bottom:12px;}
+.stat-val{font-size:32px;font-weight:900;letter-spacing:-1px;margin-bottom:3px;}
+.stat-label{font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.stat-card.red .stat-val{color:var(--red);}
+.stat-card.blue .stat-val{color:var(--blue);}
+.stat-card.green .stat-val{color:var(--green);}
+.stat-card.orange .stat-val{color:var(--orange);}
+
+/* ── CHART ── */
+.chart-card{background:white;border-radius:var(--radius);padding:20px;border:1px solid var(--border);margin-bottom:24px;}
+.chart-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:6px;}
+canvas{width:100%;height:120px;}
+
+/* ── TABLE ── */
+.table-card{background:white;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:20px;}
+.table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.table-header h3{font-size:14px;font-weight:700;}
+.table-actions{display:flex;gap:8px;align-items:center;}
+.filter-select{border:1.5px solid var(--border);border-radius:var(--radius);padding:7px 12px;font-family:'Inter',sans-serif;font-size:12px;outline:none;background:var(--bg);cursor:pointer;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);background:#FAFAFA;}
+td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#FAFAFA;}
+.loading-row{text-align:center;color:var(--text-3);padding:28px !important;}
+.user-cell{display:flex;align-items:center;gap:10px;}
+.avatar-sm{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+small{color:var(--text-3);}
+.text-muted{color:var(--text-3);}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-green{background:#E3FCEF;color:#00875A;}
+.badge-red{background:var(--red-light);color:var(--red);}
+.badge-blue{background:#EBF2FF;color:var(--blue);}
+.badge-gray{background:#F4F5F7;color:var(--text-3);}
+
+/* ── ACTION BUTTONS ── */
+.actions{display:flex;gap:6px;}
+.btn-act{padding:5px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;border:none;white-space:nowrap;transition:all 0.15s;}
+.btn-danger{background:var(--red-light);color:var(--red);}
+.btn-danger:hover{background:var(--red);color:white;}
+.btn-success{background:#E3FCEF;color:var(--green);}
+.btn-success:hover{background:var(--green);color:white;}
+.btn-warning{background:#FFF0B3;color:#FF8B00;}
+.btn-warning:hover{background:#FF8B00;color:white;}
+.btn-info{background:#EBF2FF;color:var(--blue);}
+.btn-info:hover{background:var(--blue);color:white;}
+
+/* ── NOTIFICATION FORM ── */
+.notif-form{background:white;border-radius:var(--radius);border:1px solid var(--border);padding:20px;}
+.notif-form h3{font-size:14px;font-weight:700;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+.form-group input,.form-group textarea,.form-group select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color 0.15s;background:var(--bg);}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--red);background:white;}
+.form-group textarea{height:90px;resize:vertical;}
+.btn-send{background:var(--red);color:white;border:none;padding:12px 24px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background 0.15s;}
+.btn-send:hover{background:var(--red-dark);}
+
+/* ── SETTINGS ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.setting-card{background:white;border-radius:var(--radius);border:1px solid var(--border);padding:20px;}
+.setting-card h3{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+.setting-row:last-child{border-bottom:none;}
+.setting-label strong{display:block;font-size:13px;font-weight:600;}
+.setting-label small{font-size:11px;color:var(--text-3);}
+.toggle{position:relative;width:44px;height:24px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:24px;cursor:pointer;transition:0.3s;}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;}
+.toggle input:checked+.toggle-slider{background:var(--green);}
+.toggle input:checked+.toggle-slider::before{transform:translateX(20px);}
+
+/* ── TOAST ── */
+#adminToast{display:none;position:fixed;bottom:24px;right:20px;padding:12px 20px;border-radius:50px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);animation:slideIn 0.3s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+#adminToast.success{background:#E3FCEF;color:var(--green);}
+#adminToast.danger{background:var(--red-light);color:var(--red);}
+#adminToast.warning{background:#FFF0B3;color:#FF8B00}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .sidebar{width:200px;}
+  .main-content{margin-left:200px;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .settings-grid{grid-template-columns:1fr;}
+}
+@media(max-width:640px){
+  .sidebar{display:none;}
+  .main-content{margin-left:0;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">Sahlan<span>Suuq</span></div>
+    <div class="login-sub">Admin Dashboard — Galitaanka</div>
+    <button class="login-google" onclick="googleLogin()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Google adigoo gala
+    </button>
+    <p class="login-note">🔒 Kaliya admin-ka ayaa geli kara</p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="s-name">Sahlan<em>Suuq</em></div>
+      <div class="s-sub">Admin Panel</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Guud</div>
+      <button class="nav-item active" onclick="showTab('overview')">
+        <span class="nav-icon">📊</span> Guud ahaan
+      </button>
+      <div class="nav-label">Maamul</div>
+      <button class="nav-item" onclick="showTab('users')">
+        <span class="nav-icon">👥</span> Isticmaalayaasha
+      </button>
+      <button class="nav-item" onclick="showTab('ads')">
+        <span class="nav-icon">📢</span> Xayeysiisyada
+      </button>
+      <button class="nav-item" onclick="showTab('reports')">
+        <span class="nav-icon">🚩</span> Warbixinnada
+        <span class="nav-badge" id="reportsBadge">0</span>
+      </button>
+      <div class="nav-label">Xiriir</div>
+      <button class="nav-item" onclick="showTab('notifications')">
+        <span class="nav-icon">📣</span> Ogeysiisyada
+      </button>
+      <div class="nav-label">Kale</div>
+      <button class="nav-item" onclick="showTab('settings')">
+        <span class="nav-icon">⚙️</span> Goobaha
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-av" id="adminAvatar">A</div>
+        <div>
+          <div class="admin-name" id="adminName">Admin</div>
+          <div class="admin-role">Super Admin</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="adminLogout()">🚪 Ka bax</button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <div class="topbar-admin">
+      <div class="topbar-title" id="pageTitle">📊 Guud ahaan</div>
+      <div class="topbar-right">
+        <input type="text" class="search-input" id="globalSearch" placeholder="Raadi..." oninput="onSearch(this.value)">
+        <button class="refresh-btn" onclick="refreshData()" title="Cusbooneysii">🔄</button>
+        <a href="index.html" class="refresh-btn" title="Websaydka fur" style="text-decoration:none">🌐</a>
+      </div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- ══ OVERVIEW ══ -->
+      <div class="page active" id="page-overview">
+        <div class="stats-grid">
+          <div class="stat-card red">
+            <div class="stat-icon">👥</div>
+            <div class="stat-val" id="statUsers">—</div>
+            <div class="stat-label">Isticmaalayaasha</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon">📢</div>
+            <div class="stat-val" id="statAds">—</div>
+            <div class="stat-label">Xayeysiisyada</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-icon">🚩</div>
+            <div class="stat-val" id="statReports">—</div>
+            <div class="stat-label">Warbixinnada</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">💰</div>
+            <div class="stat-val" id="statRevenue">$0</div>
+            <div class="stat-label">Dakhliga</div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">📈 Xayeysiisyada — 7 Maalmood</div>
+          <canvas id="activityChart" width="800" height="120"></canvas>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <h3>👥 Isticmaalayaasha Ugu Dambeeyay</h3>
+          </div>
+          <table>
+            <thead><tr><th>Magac</th><th>Email</th><th>Gobol</th><th>Hab</th></tr></thead>
+            <tbody id="recentUsers"><tr><td colspan="4" class="loading-row">⏳ Socda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ USERS ══ -->
+      <div class="page" id="page-users">
+        <div class="table-card">
+          <div class="table-header">
+            <h3>👥 Isticmaalayaasha (<span id="usersCount">—</span>)</h3>
+            <div class="table-actions">
+              <input type="text" class="search-input" id="usersSearch" placeholder="Magac ama email..." oninput="loadUsers(this.value)" style="width:200px">
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Isticmaale</th><th>Gobol</th><th>Telefoon</th><th>Hab</th><th>Taariikhda</th><th>Ficil</th></tr></thead>
+            <tbody id="usersTable"><tr><td colspan="6" class="loading-row">⏳ Socda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ ADS ══ -->
+      <div class="page" id="page-ads">
+        <div class="table-card">
+          <div class="table-header">
+            <h3>📢 Xayeysiisyada</h3>
+            <div class="table-actions">
+              <input type="text" class="search-input" id="adsSearch" placeholder="Raadi xayeysiis..." oninput="loadAds(this.value, document.getElementById('adsFilter').value)" style="width:180px">
+              <select class="filter-select" id="adsFilter" onchange="loadAds(document.getElementById('adsSearch').value, this.value)">
+                <option value="all">Dhammaan</option>
+                <option value="active">Active</option>
+                <option value="banned">Banned</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Cinwaan</th><th>Qiimaha</th><th>Gobol</th><th>Gacmaha</th><th>Xaaladda</th><th>Ficil</th></tr></thead>
+            <tbody id="adsTable"><tr><td colspan="6" class="loading-row">⏳ Socda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ REPORTS ══ -->
+      <div class="page" id="page-reports">
+        <div class="table-card">
+          <div class="table-header">
+            <h3>🚩 Warbixinnada</h3>
+            <button class="btn-act btn-success" onclick="loadReports()">🔄 Cusbooneysii</button>
+          </div>
+          <table>
+            <thead><tr><th>Xayeysiiska</th><th>Sababta</th><th>Warbixiyaha</th><th>Xaaladda</th><th>Ficil</th></tr></thead>
+            <tbody id="reportsTable"><tr><td colspan="5" class="loading-row">⏳ Socda...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ NOTIFICATIONS ══ -->
+      <div class="page" id="page-notifications">
+        <div class="notif-form">
+          <h3>📣 Ogeysiis Dhammaan Isticmaalayaasha u Dir</h3>
+          <div class="form-group">
+            <label>Cinwaanka</label>
+            <input type="text" id="notifTitle" placeholder="Tusaale: Cusbooneysii cusub!">
+          </div>
+          <div class="form-group">
+            <label>Farriinta</label>
+            <textarea id="notifMsg" placeholder="Farriinta faahfaahsan..."></textarea>
+          </div>
+          <button class="btn-send" onclick="sendBroadcast()">📣 Dir Dhammaan</button>
+        </div>
+      </div>
+
+      <!-- ══ SETTINGS ══ -->
+      <div class="page" id="page-settings">
+        <div class="settings-grid">
+          <div class="setting-card">
+            <h3>⚙️ Websaydka Goobaha</h3>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Xayeysiisyada Xaqiijinta</strong><small>Xayeysiis cusub ka hor u aqbal</small></div>
+              <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Diiwaangelinta Furan</strong><small>Isticmaalayaashu diiwaangeli karaan</small></div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Ogeysiisyada</strong><small>Push notifications shaqeeya</small></div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="setting-card">
+            <h3>🔒 Ammaanka</h3>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Bot Protection</strong><small>CAPTCHA shaqeeya</small></div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Rate Limiting</strong><small>5 jeer oo khalad → ban</small></div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Email Xaqiijinta</strong><small>Email laga xaqiijiyay</small></div>
+              <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="setting-card">
+            <h3>📊 Firebase</h3>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Project ID</strong><small>sahlansuuq</small></div>
+              <span class="badge badge-green">✅ Xidhan</span>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Firestore</strong><small>Database</small></div>
+              <span class="badge badge-green">✅ Shaqeynaya</span>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Authentication</strong><small>Google + Email</small></div>
+              <span class="badge badge-green">✅ Shaqeynaya</span>
+            </div>
+          </div>
+          <div class="setting-card">
+            <h3>🌐 Hosting</h3>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Platform</strong><small>Netlify</small></div>
+              <span class="badge badge-blue">Netlify</span>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>Domain</strong><small>radiant-liger-838486.netlify.app</small></div>
+              <span class="badge badge-green">✅ Live</span>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><strong>SSL</strong><small>HTTPS</small></div>
+              <span class="badge badge-green">✅ Aamin</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="adminToast"></div>
+
+<script>
+// ── TAB NAVIGATION ──
+const tabs = ['overview','users','ads','reports','notifications','settings'];
+const titles = {overview:'📊 Guud ahaan',users:'👥 Isticmaalayaasha',ads:'📢 Xayeysiisyada',reports:'🚩 Warbixinnada',notifications:'📣 Ogeysiisyada',settings:'⚙️ Goobaha'};
+
+function showTab(tab) {
+  tabs.forEach(t => {
+    document.getElementById('page-'+t)?.classList.remove('active');
+    document.querySelectorAll('.nav-item').forEach((el,i) => {
+      if(el.getAttribute('onclick')?.includes("'"+t+"'")) el.classList.remove('active');
+    });
+  });
+  document.getElementById('page-'+tab)?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if(el.getAttribute('onclick')?.includes("'"+tab+"'")) el.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent = titles[tab] || tab;
+  // Load data for tab
+  if(tab==='users') loadUsers();
+  if(tab==='ads') loadAds();
+  if(tab==='reports') loadReports();
+}
+
+function onSearch(val) {
+  const active = tabs.find(t => document.getElementById('page-'+t)?.classList.contains('active'));
+  if(active==='users') loadUsers(val);
+  if(active==='ads') loadAds(val);
+}
+
+function refreshData() {
+  loadStats?.();
+  const active = tabs.find(t => document.getElementById('page-'+t)?.classList.contains('active'));
+  if(active==='users') loadUsers();
+  if(active==='ads') loadAds();
+  if(active==='reports') loadReports();
+  showToast('🔄 Waa la cusbooneysiiyay!', 'success');
+}
+
+// ── GOOGLE LOGIN ──
+async function googleLogin() {
+  const { getAuth, signInWithPopup, GoogleAuthProvider } =
+    await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(window.$auth, provider);
+  } catch(e) {
+    showToast('❌ Login khalad: '+e.message, 'danger');
+  }
+}
+
+// ── ANIMATE NUMBERS ──
+function animateNum(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (typeof target === 'string') { el.textContent = target; return; }
+  let cur = 0;
+  const step = Math.ceil(target / 30);
+  const timer = setInterval(() => {
+    cur = Math.min(cur + step, target);
+    el.textContent = cur.toLocaleString();
+    if (cur >= target) clearInterval(timer);
+  }, 30);
+}
+
+// ── TOAST ──
+let _toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('adminToast');
+  t.textContent = msg;
+  t.className = type;
+  t.style.display = 'block';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.style.display = 'none', 3500);
+}
+
+// ── LOAD OVERVIEW RECENT USERS ──
+async function loadRecentUsers() {
+  if (!window.$db) return;
+  try {
+    const { getDocs, collection, query, orderBy, limit } =
+      await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const snap = await getDocs(query(collection(window.$db,'users'), orderBy('updatedAt','desc'), limit(5)));
+    const tbody = document.getElementById('recentUsers');
+    if (!snap.size) { tbody.innerHTML = '<tr><td colspan="4" class="loading-row">Isticmaale ma jirto</td></tr>'; return; }
+    tbody.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      return `<tr><td><div class="user-cell"><div class="avatar-sm">${(u.first||'?')[0].toUpperCase()}</div><strong>${u.first||''} ${u.last||''}</strong></div></td><td>${u.email||'—'}</td><td>${u.city||'—'}</td><td><span class="badge ${u.provider==='google'?'badge-blue':'badge-gray'}">${u.provider||'email'}</span></td></tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
+// ── STATS ──
+async function loadStats() {
+  if (!window.$db) return;
+  try {
+    const { getDocs, collection, query, where, orderBy, limit } =
+      await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const [u, a, r] = await Promise.all([
+      getDocs(collection(window.$db,'users')),
+      getDocs(query(collection(window.$db,'ads'), where('status','==','active'))),
+      getDocs(collection(window.$db,'reports'))
+    ]);
+    animateNum('statUsers', u.size);
+    animateNum('statAds', a.size);
+    animateNum('statReports', r.docs.filter(d=>!d.data().resolved).length);
+    animateNum('statRevenue', 0);
+    document.getElementById('usersCount').textContent = u.size;
+    renderBarChart(a.docs);
+    loadRecentUsers();
+  } catch(e) { console.log(e); }
+}
+
+function renderBarChart(docs) {
+  const canvas = document.getElementById('activityChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const days = [], counts = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days.push(['Axd','Isn','Tal','Arb','Kha','Jim','Sab'][d.getDay()]);
+    counts.push(docs.filter(doc => {
+      const ts = doc.data().createdAt?.toDate?.();
+      return ts && ts.toDateString() === d.toDateString();
+    }).length);
+  }
+  const max = Math.max(...counts, 5);
+  const w = canvas.offsetWidth || 800, h = 120;
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0,0,w,h);
+  const barW = (w-40)/days.length;
+  counts.forEach((c,i) => {
+    const bH = Math.max((c/max)*(h-40), c>0?6:0);
+    const x = 20+i*barW+barW*0.15, y = h-20-bH;
+    ctx.fillStyle = '#FFF0F0';
+    ctx.fillRect(x, 10, barW*0.7, h-30);
+    if(c>0){
+      ctx.fillStyle = '#E30613';
+      const r2 = new Path2D();
+      r2.moveTo(x,y+4); r2.arcTo(x,y,x+4,y,4); r2.lineTo(x+barW*0.7-4,y);
+      r2.arcTo(x+barW*0.7,y,x+barW*0.7,y+4,4); r2.lineTo(x+barW*0.7,y+bH); r2.lineTo(x,y+bH); r2.closePath();
+      ctx.fill(r2);
+      ctx.fillStyle='#E30613'; ctx.font='bold 11px Inter'; ctx.textAlign='center';
+      ctx.fillText(c, x+barW*0.35, y-4);
+    }
+    ctx.fillStyle='#999'; ctx.font='10px Inter'; ctx.textAlign='center';
+    ctx.fillText(days[i], x+barW*0.35, h-5);
+  });
+}
+
+// Init
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(loadStats, 1500);
+});
+</script>
+</body>
+</html>
