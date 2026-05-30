@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SahlanSuuq Sitemap Generator</title>
+</head>
+<body>
+<script type="module">
+// This page generates sitemap-ads.xml dynamically from Firebase
+// Run this page to regenerate the sitemap, then copy output to sitemap-ads.xml
+
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getFirestore,collection,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const FC={apiKey:"AIzaSyCgrMILfmLEc2HVCf_RaSFs4BVd1eKBQgk",authDomain:"sahlansuuq.firebaseapp.com",projectId:"sahlansuuq",storageBucket:"sahlansuuq.firebasestorage.app",messagingSenderId:"658673835512",appId:"1:658673835512:web:ba0772a3b0e5c18fda4a0d"};
+const app=initializeApp(FC);
+const db=getFirestore(app);
+
+function makeSlug(title){return(title||'ad').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').slice(0,60);}
+
+async function generateSitemap(){
+  document.body.innerHTML='<h2>⏳ Generating sitemap...</h2>';
+  try{
+    const snap=await getDocs(query(collection(db,'ads'),where('status','==','active'),orderBy('createdAt','desc'),limit(1000)));
+    const ads=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const today=new Date().toISOString().split('T')[0];
+    let xml=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
+    for(const ad of ads){
+      const slug=makeSlug(ad.title);
+      const url=`https://sahlansuuq.com/ad/${slug}-${ad.id}`;
+      const lastmod=ad.createdAt?.toDate?ad.createdAt.toDate().toISOString().split('T')[0]:today;
+      xml+=`  <url>\n    <loc>${url}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n`;
+      if(ad.images&&ad.images[0]){xml+=`    <image:image>\n      <image:loc>${ad.images[0]}</image:loc>\n      <image:title>${(ad.title||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</image:title>\n    </image:image>\n`;}
+      xml+=`  </url>\n`;
+    }
+    xml+=`</urlset>`;
+    document.body.innerHTML=`<h2>✅ ${ads.length} ads found!</h2><p>Copy this XML to <strong>sitemap-ads.xml</strong>:</p><textarea style="width:100%;height:400px;font-size:11px">${xml.replace(/</g,'&lt;')}</textarea><br><button onclick="navigator.clipboard.writeText(document.querySelector('textarea').value.replace(/&lt;/g,'<'))">📋 Copy</button>`;
+  }catch(e){document.body.innerHTML=`<h2>❌ Error: ${e.message}</h2>`;}
+}
+generateSitemap();
+</script>
+</body>
+</html>

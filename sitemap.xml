@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://sahlansuuq.com/</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="so" href="https://sahlansuuq.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sahlansuuq.com/"/>
+  </url>
+
+  <!-- Category Pages -->
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Gaadiidka</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Guryaha+%26+Dhul</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Teknoolajiyada</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Dharka</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Alaabta+Guriga</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Xoolaha</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Shaqo</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?cat=Beeraha</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- City Pages -->
+  <url>
+    <loc>https://sahlansuuq.com/?city=Mogadisho</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?city=Hargeisa</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?city=Kismaayo</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?city=Garowe</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sahlansuuq.com/?city=Bosaso</loc>
+    <lastmod>2025-05-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.75</priority>
+  </url>
+
+</urlset>
