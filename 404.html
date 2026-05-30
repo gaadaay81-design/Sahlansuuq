@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SahlanSuuq</title>
+<script>
+// GitHub Pages SPA fix — redirect 404s back to index with the path
+const path = window.location.pathname;
+const search = window.location.search;
+const hash = window.location.hash;
+const redirect = window.location.origin + '/?redirect=' + encodeURIComponent(path + search + hash);
+window.location.replace(redirect);
+</script>
+</head>
+<body>
+<p>Loading SahlanSuuq...</p>
+</body>
+</html>
