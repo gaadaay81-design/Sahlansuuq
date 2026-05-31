@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SahlanSuuq Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+:root{--red:#CC0000;--white:#fff;--gray-100:#f4f4f4;--gray-200:#e8e8e8;--gray-400:#a0a0a0;--gray-700:#303030;--gray-900:#111;--green:#16a34a;--yellow:#d97706;--radius:8px;--font:'Segoe UI',system-ui,sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--gray-100);min-height:100vh;}
+a{color:inherit;text-decoration:none;}
+button{font-family:var(--font);cursor:pointer;border:none;background:none;}
+
+/* Topbar */
+.topbar{background:var(--gray-900);color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:100;}
+.topbar-logo{font-size:18px;font-weight:800;color:var(--red);}
+.topbar-logo span{color:#fff;font-weight:300;}
+.admin-user{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--gray-400);}
+
+/* Layout */
+.layout{display:flex;padding-top:52px;min-height:100vh;}
+.sidebar{width:220px;background:var(--gray-900);min-height:calc(100vh - 52px);padding:16px 0;flex-shrink:0;position:fixed;top:52px;bottom:0;left:0;overflow-y:auto;}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:11px 20px;color:rgba(255,255,255,.65);font-size:14px;cursor:pointer;border-left:3px solid transparent;transition:.15s;}
+.sidebar-item:hover,.sidebar-item.active{color:#fff;background:rgba(255,255,255,.06);border-left-color:var(--red);}
+.sidebar-icon{font-size:17px;width:22px;text-align:center;}
+.content{flex:1;padding:24px;margin-left:220px;}
+
+/* Cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--white);border-radius:var(--radius);padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.stat-val{font-size:30px;font-weight:900;color:var(--red);}
+.stat-label{font-size:12px;color:var(--gray-400);margin-top:4px;}
+.stat-card.green .stat-val{color:var(--green);}
+.stat-card.yellow .stat-val{color:var(--yellow);}
+
+/* Table */
+.table-wrap{background:var(--white);border-radius:var(--radius);box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:20px;}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--gray-200);}
+.table-title{font-size:15px;font-weight:700;color:var(--gray-900);}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:12px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border-bottom:1px solid var(--gray-200);}
+td{padding:12px 16px;font-size:13px;color:var(--gray-700);border-bottom:1px solid var(--gray-100);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--gray-100);}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
+.badge.active{background:#dcfce7;color:var(--green);}
+.badge.pending{background:#fef3c7;color:var(--yellow);}
+.badge.deleted{background:#fee2e2;color:#dc2626;}
+.badge.open{background:#dbeafe;color:#2563eb;}
+.badge.resolved{background:#dcfce7;color:var(--green);}
+.btn{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:.15s;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-gray{background:var(--gray-200);color:var(--gray-700);}
+.btn:hover{opacity:.85;}
+
+/* Section */
+.section{display:none;}
+.section.active{display:block;}
+.section-title{font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:16px;}
+
+/* Login wall */
+#loginWall{position:fixed;inset:0;background:var(--gray-900);display:flex;align-items:center;justify-content:center;z-index:999;}
+.login-card{background:var(--white);border-radius:12px;padding:32px;width:340px;text-align:center;}
+.login-card h2{font-size:22px;font-weight:900;color:var(--red);margin-bottom:4px;}
+.login-card p{font-size:13px;color:var(--gray-400);margin-bottom:20px;}
+.form-control{width:100%;height:42px;border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:0 12px;font-size:14px;margin-bottom:10px;outline:none;}
+.form-control:focus{border-color:var(--red);}
+.btn-full{width:100%;height:42px;border-radius:var(--radius);font-size:15px;}
+.err-msg{color:#dc2626;font-size:13px;margin-top:6px;}
+
+/* Toast */
+.toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;}
+.toast{background:var(--gray-900);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;margin-top:6px;animation:toastIn .2s ease;}
+.toast.success{background:var(--green);}
+.toast.error{background:#dc2626;}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .content{margin-left:0;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  table{font-size:12px;}
+  td,th{padding:8px 10px;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN WALL -->
+<div id="loginWall">
+  <div class="login-card">
+    <h2>🔐 Admin</h2>
+    <p>SahlanSuuq Admin Dashboard</p>
+    <input class="form-control" id="adminEmail" type="email" placeholder="Email">
+    <input class="form-control" id="adminPw" type="password" placeholder="Fur-sirta">
+    <button class="btn btn-red btn-full" onclick="adminLogin()">Gal</button>
+    <div class="err-msg" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <div class="topbar-logo">SahlanSuuq <span>Admin</span></div>
+  <div class="admin-user">
+    <span id="adminName"></span>
+    <button onclick="doLogout()" style="color:var(--gray-400);font-size:13px;">Ka bax</button>
+  </div>
+</nav>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-item active" onclick="showSection('dashboard')"><span class="sidebar-icon">📊</span> Dashboard</div>
+    <div class="sidebar-item" onclick="showSection('ads')"><span class="sidebar-icon">📋</span> Xayeysiisyada</div>
+    <div class="sidebar-item" onclick="showSection('users')"><span class="sidebar-icon">👥</span> Isticmaalayaasha</div>
+    <div class="sidebar-item" onclick="showSection('reports')"><span class="sidebar-icon">🚨</span> Warbixinnada</div>
+    <div class="sidebar-item" onclick="showSection('reviews')"><span class="sidebar-icon">⭐</span> Qiimeeynta</div>
+    <div class="sidebar-item" onclick="showSection('chats')"><span class="sidebar-icon">💬</span> Farriimahaaga</div>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <div class="section active" id="sec-dashboard">
+      <div class="section-title">📊 Guud Ahaan</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-val" id="statAds">–</div><div class="stat-label">Xayeysiisyo (Active)</div></div>
+        <div class="stat-card"><div class="stat-val" id="statUsers">–</div><div class="stat-label">Isticmaalayaasha</div></div>
+        <div class="stat-card yellow"><div class="stat-val" id="statReports">–</div><div class="stat-label">Warbixin (Pending)</div></div>
+        <div class="stat-card green"><div class="stat-val" id="statReviews">–</div><div class="stat-label">Qiimeeynta</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-title">🔥 Xayeysiisyada Ugu Cusub</span></div>
+        <table><thead><tr><th>Cinwaan</th><th>Qiimaha</th><th>Gobol</th><th>Xaaladda</th><th>Waqtiga</th><th>Fal</th></tr></thead>
+        <tbody id="recentAdsBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ADS -->
+    <div class="section" id="sec-ads">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div class="section-title" style="margin:0;">📋 Dhammaan Xayeysiisyada</div>
+        <select id="adsStatusFilter" onchange="loadAdsTable()" style="height:34px;border-radius:6px;border:1.5px solid var(--gray-200);padding:0 10px;font-size:13px;">
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="deleted">Deleted</option>
+          <option value="">Dhammaan</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Cinwaan</th><th>Iibiye</th><th>Qiimaha</th><th>Gobol</th><th>Xaaladda</th><th>View</th><th>Fal</th></tr></thead>
+        <tbody id="adsBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="section" id="sec-users">
+      <div class="section-title">👥 Isticmaalayaasha</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Magaca</th><th>Email</th><th>Gobol</th><th>Qiimeeynta</th><th>Ku biirtay</th><th>Fal</th></tr></thead>
+        <tbody id="usersBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="section" id="sec-reports">
+      <div class="section-title">🚨 Warbixinnada</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Xayeysiiska</th><th>Sababta</th><th>Faahfaahin</th><th>Xaaladda</th><th>Waqtiga</th><th>Fal</th></tr></thead>
+        <tbody id="reportsBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- REVIEWS -->
+    <div class="section" id="sec-reviews">
+      <div class="section-title">⭐ Qiimeeynta</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Iibiye</th><th>Qiimeeye</th><th>Xiddigaha</th><th>Faallo</th><th>Waqtiga</th><th>Fal</th></tr></thead>
+        <tbody id="reviewsBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CHATS -->
+    <div class="section" id="sec-chats">
+      <div class="section-title">💬 Xiriirrada</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Qoysaska</th><th>Farriinta Dambe</th><th>Waqtiga</th></tr></thead>
+        <tbody id="chatsBody"></tbody></table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCgrMILfmLEc2HVCf_RaSFs4BVd1eKBQgk",
+  authDomain: "sahlansuuq.firebaseapp.com",
+  projectId: "sahlansuuq",
+  storageBucket: "sahlansuuq.firebasestorage.app",
+  messagingSenderId: "658673835512",
+  appId: "1:658673835512:web:ba0772a3b0e5c18fda4a0d",
+  measurementId: "G-Y1TRKQZ0JS"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentAdmin = null;
+const loginWall = document.getElementById('loginWall');
+
+auth.onAuthStateChanged(async user => {
+  if (!user) { loginWall.style.display = 'flex'; return; }
+  const adminDoc = await db.collection('admins').doc(user.uid).get().catch(() => null);
+  if (!adminDoc?.exists) {
+    auth.signOut();
+    document.getElementById('loginErr').textContent = 'Admin access denied.';
+    loginWall.style.display = 'flex';
+    return;
+  }
+  currentAdmin = user;
+  loginWall.style.display = 'none';
+  document.getElementById('adminName').textContent = user.email;
+  loadDashboard();
+});
+
+async function adminLogin() {
+  const email = document.getElementById('adminEmail').value.trim();
+  const pw = document.getElementById('adminPw').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  try { await auth.signInWithEmailAndPassword(email, pw); }
+  catch(e) { err.textContent = e.message; }
+}
+async function doLogout() { await auth.signOut(); loginWall.style.display = 'flex'; }
+
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  document.getElementById(`sec-${id}`).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(s => {
+    if (s.getAttribute('onclick')?.includes(id)) s.classList.add('active');
+  });
+  const loaders = { ads: loadAdsTable, users: loadUsers, reports: loadReports, reviews: loadReviews, chats: loadChats };
+  if (loaders[id]) loaders[id]();
+}
+
+async function loadDashboard() {
+  try {
+    const [adsSnap, usersSnap, reportsSnap, reviewsSnap] = await Promise.all([
+      db.collection('ads').where('status','==','active').get(),
+      db.collection('users').get(),
+      db.collection('reports').where('status','==','pending').get(),
+      db.collection('reviews').get()
+    ]);
+    document.getElementById('statAds').textContent = adsSnap.size;
+    document.getElementById('statUsers').textContent = usersSnap.size;
+    document.getElementById('statReports').textContent = reportsSnap.size;
+    document.getElementById('statReviews').textContent = reviewsSnap.size;
+
+    const recent = await db.collection('ads').orderBy('createdAt','desc').limit(10).get();
+    document.getElementById('recentAdsBody').innerHTML = recent.docs.map(d => {
+      const a = d.data();
+      return `<tr>
+        <td><b>${esc(a.title)}</b></td>
+        <td>$${a.price||0}</td>
+        <td>${esc(a.location||'')}</td>
+        <td><span class="badge ${a.status||'active'}">${a.status||'active'}</span></td>
+        <td>${timeAgo(a.createdAt)}</td>
+        <td>
+          <button class="btn btn-gray" onclick="window.open('/ad/${d.id}')">👁</button>
+          <button class="btn btn-red" onclick="removeAd('${d.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+async function loadAdsTable() {
+  const status = document.getElementById('adsStatusFilter').value;
+  let q = db.collection('ads').orderBy('createdAt','desc').limit(50);
+  if (status) q = db.collection('ads').where('status','==',status).orderBy('createdAt','desc').limit(50);
+  const snap = await q.get().catch(e => { toast(e.message,'error'); return null; });
+  if (!snap) return;
+  document.getElementById('adsBody').innerHTML = snap.docs.map(d => {
+    const a = d.data();
+    return `<tr>
+      <td>${esc(a.title)}</td>
+      <td>${esc(a.sellerName||'')}</td>
+      <td>$${a.price||0}</td>
+      <td>${esc(a.location||'')}</td>
+      <td><span class="badge ${a.status||'active'}">${a.status||'active'}</span></td>
+      <td>${a.views||0}</td>
+      <td>
+        ${a.status!=='active'?`<button class="btn btn-green" onclick="setAdStatus('${d.id}','active')">✅</button>`:''}
+        <button class="btn btn-red" onclick="removeAd('${d.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function removeAd(id) {
+  if (!confirm('Xayeysiiskaan tirtir?')) return;
+  await db.collection('ads').doc(id).update({ status:'deleted' });
+  toast('Xayeysiiska la tirtiray','success');
+  loadAdsTable();
+}
+async function setAdStatus(id, status) {
+  await db.collection('ads').doc(id).update({ status });
+  toast('Xaaladda la cusbooneysiiyay','success');
+  loadAdsTable();
+}
+
+async function loadUsers() {
+  const snap = await db.collection('users').orderBy('createdAt','desc').limit(100).get().catch(()=>null);
+  if (!snap) return;
+  document.getElementById('usersBody').innerHTML = snap.docs.map(d => {
+    const u = d.data();
+    return `<tr>
+      <td>${esc(u.firstName||'')} ${esc(u.lastName||'')}</td>
+      <td>${esc(u.email||'')}</td>
+      <td>${esc(u.location||'')}</td>
+      <td>${(u.avgRating||0).toFixed(1)} ★ (${u.reviewCount||0})</td>
+      <td>${timeAgo(u.createdAt)}</td>
+      <td>
+        <button class="btn btn-gray" onclick="makeAdmin('${d.id}')">👑 Admin</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function makeAdmin(uid) {
+  if (!confirm('Admin ka dhig?')) return;
+  await db.collection('admins').doc(uid).set({ uid, grantedBy: currentAdmin.uid, grantedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  toast('Admin la dhigay','success');
+}
+
+async function loadReports() {
+  const snap = await db.collection('reports').orderBy('createdAt','desc').limit(100).get().catch(()=>null);
+  if (!snap) return;
+  const reasons = { fake:'Been ah', wrong_price:'Qiime khaldan', wrong_images:'Sawirro khaldan', spam:'Spam', inappropriate:'Arag xun', scam:'Khiyaano', other:'Kale' };
+  document.getElementById('reportsBody').innerHTML = snap.docs.map(d => {
+    const r = d.data();
+    return `<tr>
+      <td><button class="btn btn-gray" onclick="window.open('/ad/${r.adId||''}')">👁 ${esc(r.adId?.slice(-6)||'')}</button></td>
+      <td>${reasons[r.reason]||esc(r.reason||'')}</td>
+      <td>${esc(r.detail||'–')}</td>
+      <td><span class="badge ${r.status==='resolved'?'resolved':'open'}">${r.status||'pending'}</span></td>
+      <td>${timeAgo(r.createdAt)}</td>
+      <td>
+        <button class="btn btn-green" onclick="resolveReport('${d.id}')">✅</button>
+        <button class="btn btn-red" onclick="removeAd('${r.adId}')">🗑️ Ad</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function resolveReport(id) {
+  await db.collection('reports').doc(id).update({ status:'resolved' });
+  toast('Warbixinta la xaliyay','success');
+  loadReports();
+}
+
+async function loadReviews() {
+  const snap = await db.collection('reviews').orderBy('createdAt','desc').limit(100).get().catch(()=>null);
+  if (!snap) return;
+  document.getElementById('reviewsBody').innerHTML = snap.docs.map(d => {
+    const r = d.data();
+    const stars = '★'.repeat(r.rating||0)+'☆'.repeat(5-(r.rating||0));
+    return `<tr>
+      <td>${esc(r.sellerId?.slice(-6)||'')}</td>
+      <td>${esc(r.reviewerName||'')}</td>
+      <td style="color:#f59e0b;">${stars}</td>
+      <td>${esc(r.text||'–')}</td>
+      <td>${timeAgo(r.createdAt)}</td>
+      <td><button class="btn btn-red" onclick="deleteReview('${d.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteReview(id) {
+  if (!confirm('Qiimeeyntaan tirtir?')) return;
+  await db.collection('reviews').doc(id).delete();
+  toast('Qiimeeynta la tirtiray','success');
+  loadReviews();
+}
+
+async function loadChats() {
+  const snap = await db.collection('chats').orderBy('lastMsgTime','desc').limit(50).get().catch(()=>null);
+  if (!snap) return;
+  document.getElementById('chatsBody').innerHTML = snap.docs.map(d => {
+    const c = d.data();
+    return `<tr>
+      <td>${(c.participants||[]).map(p=>p.slice(-6)).join(' · ')}</td>
+      <td>${esc(c.lastMsg||'...')}</td>
+      <td>${timeAgo(c.lastMsgTime)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  let date;
+  try { date = ts.toDate ? ts.toDate() : new Date(ts); } catch { return ''; }
+  const diff = (Date.now()-date.getTime())/1000;
+  if (diff < 60) return 'Haddeer';
+  if (diff < 3600) return `${Math.floor(diff/60)} dq`;
+  if (diff < 86400) return `${Math.floor(diff/3600)} saac`;
+  return `${Math.floor(diff/86400)} maalmo`;
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toast(msg, type='') {
+  const w = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`; el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(()=>el.remove(),3000);
+}
+</script>
+</body>
+</html>
